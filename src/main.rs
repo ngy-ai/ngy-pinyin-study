@@ -450,6 +450,7 @@ impl Render for AppView {
                     .child(
                         v_flex()
                             .flex_1()
+                            .min_w(px(0.))
                             .min_h(px(0.))
                             .px_6()
                             .pb_6()

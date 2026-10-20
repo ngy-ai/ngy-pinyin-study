@@ -87,7 +87,9 @@ pub fn has_tone(syllable: &str, tone: u8) -> bool {
 }
 
 fn tone_clip(syllable: &str, tone: u8) -> String {
-    format!("tone/{syllable}{}.mp3", tone.clamp(1, 4))
+    // 录音文件里 ü 写作 v（nü → nv），和 base/ 的命名保持一致
+    let name = syllable.replace('ü', "v");
+    format!("tone/{name}{}.mp3", tone.clamp(1, 4))
 }
 
 fn send(cmd: Cmd) {

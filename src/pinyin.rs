@@ -622,6 +622,152 @@ pub const BLENDS: &[Blend] = &[
     blend!("s", "i", "si", [("sī", "丝"), ("sǐ", "死"), ("sì", "四")]),
 ];
 
+/// 声母韵母拼合表：每个声母能拼的全部韵母（按《汉语拼音音节表》）。
+///
+/// `BLENDS` 只收录了有四声例字的音节，这里保证「第二步选韵母」不会漏掉能拼的组合。
+pub const BLEND_FINALS: &[(&str, &[&str])] = &[
+    (
+        "b",
+        &[
+            "a", "o", "ai", "ei", "ao", "an", "en", "ang", "eng", "i", "ie", "iao", "ian", "in",
+            "ing", "u",
+        ],
+    ),
+    (
+        "p",
+        &[
+            "a", "o", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "i", "ie", "iao", "ian",
+            "in", "ing", "u",
+        ],
+    ),
+    (
+        "m",
+        &[
+            "a", "o", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "i", "ie", "iao",
+            "iu", "ian", "in", "ing", "u",
+        ],
+    ),
+    ("f", &["a", "o", "ei", "ou", "an", "en", "ang", "eng", "u"]),
+    (
+        "d",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "ia", "ie",
+            "iao", "iu", "ian", "ing", "u", "uo", "ui", "uan", "un",
+        ],
+    ),
+    (
+        "t",
+        &[
+            "a", "e", "ai", "ao", "ou", "an", "ang", "eng", "ong", "i", "ie", "iao", "ian", "ing",
+            "u", "uo", "ui", "uan", "un",
+        ],
+    ),
+    (
+        "n",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "ie", "iao",
+            "iu", "ian", "in", "iang", "ing", "u", "uo", "uan", "ü", "üe",
+        ],
+    ),
+    (
+        "l",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "ang", "eng", "ong", "i", "ia", "ie", "iao",
+            "iu", "ian", "in", "iang", "ing", "u", "uo", "uan", "un", "ü", "üe",
+        ],
+    ),
+    (
+        "g",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "u", "ua", "uo",
+            "uai", "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "k",
+        &[
+            "a", "e", "ai", "ao", "ou", "an", "en", "ang", "eng", "ong", "u", "ua", "uo", "uai",
+            "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "h",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "u", "ua", "uo",
+            "uai", "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "j",
+        &[
+            "i", "ia", "ie", "iao", "iu", "ian", "in", "iang", "ing", "iong", "ü", "üe", "üan",
+            "ün",
+        ],
+    ),
+    (
+        "q",
+        &[
+            "i", "ia", "ie", "iao", "iu", "ian", "in", "iang", "ing", "iong", "ü", "üe", "üan",
+            "ün",
+        ],
+    ),
+    (
+        "x",
+        &[
+            "i", "ia", "ie", "iao", "iu", "ian", "in", "iang", "ing", "iong", "ü", "üe", "üan",
+            "ün",
+        ],
+    ),
+    (
+        "zh",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "ua",
+            "uo", "uai", "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "ch",
+        &[
+            "a", "e", "ai", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "ua", "uo",
+            "uai", "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "sh",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "i", "u", "ua", "uo",
+            "uai", "ui", "uan", "un", "uang",
+        ],
+    ),
+    (
+        "r",
+        &[
+            "e", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "uo", "ui", "uan", "un",
+        ],
+    ),
+    (
+        "z",
+        &[
+            "a", "e", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "uo",
+            "ui", "uan", "un",
+        ],
+    ),
+    (
+        "c",
+        &[
+            "a", "e", "ai", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "uo", "ui",
+            "uan", "un",
+        ],
+    ),
+    (
+        "s",
+        &[
+            "a", "e", "ai", "ao", "ou", "an", "en", "ang", "eng", "ong", "i", "u", "uo", "ui",
+            "uan", "un",
+        ],
+    ),
+];
+
 /// 可以对孩子说的鼓励话。
 pub const PRAISE: &[&str] = &["太棒了", "真聪明", "好厉害", "答对啦"];
 
@@ -636,13 +782,26 @@ pub fn blend_initials() -> Vec<&'static str> {
     out
 }
 
-/// 指定声母可拼的韵母。
+/// 指定声母可拼的全部韵母（按拼合表，而不是只看有没有例字）。
 pub fn blend_finals(initial: &str) -> Vec<&'static str> {
+    if let Some((_, finals)) = BLEND_FINALS.iter().find(|(i, _)| *i == initial) {
+        return finals.to_vec();
+    }
     BLENDS
         .iter()
         .filter(|b| b.initial == initial)
         .map(|b| b.final_)
         .collect()
+}
+
+/// 声母 + 韵母拼出来的音节。`j / q / x` 遇到 `ü` 要去掉两点（jü → ju）。
+pub fn syllable(initial: &str, final_: &str) -> String {
+    if matches!(initial, "j" | "q" | "x")
+        && let Some(rest) = final_.strip_prefix('ü')
+    {
+        return format!("{initial}u{rest}");
+    }
+    format!("{initial}{final_}")
 }
 
 pub fn find_blend(initial: &str, final_: &str) -> Option<&'static Blend> {
@@ -1176,5 +1335,44 @@ mod tests {
                 assert!(crate::audio::has_letter(letter.text), "{}", letter.text);
             }
         }
+    }
+
+    /// 拼一拼要列出每个声母能拼的全部韵母，不能只看有没有例字。
+    #[test]
+    fn every_initial_lists_all_its_finals() {
+        for (initial, finals) in BLEND_FINALS {
+            assert!(!finals.is_empty(), "{initial}");
+            assert_eq!(blend_finals(initial).len(), finals.len(), "{initial}");
+        }
+        // b 不只有 a / i / ao
+        assert!(blend_finals("b").contains(&"u"));
+        assert!(blend_finals("b").contains(&"ie"));
+        // j / q / x 能和 ü 系列相拼
+        assert!(blend_finals("j").contains(&"ü"));
+        assert!(blend_finals("j").contains(&"üe"));
+        // 有例字的音节必须落在拼合表里
+        for blend in BLENDS {
+            assert!(
+                blend_finals(blend.initial).contains(&blend.final_),
+                "{} {}",
+                blend.initial,
+                blend.final_
+            );
+        }
+    }
+
+    /// 拼出来的音节：j / q / x 遇 ü 去两点，n / l 保留两点。
+    #[test]
+    fn initials_and_finals_spell_correctly() {
+        assert_eq!(syllable("b", "a"), "ba");
+        assert_eq!(syllable("zh", "uang"), "zhuang");
+        assert_eq!(syllable("j", "ü"), "ju");
+        assert_eq!(syllable("j", "üe"), "jue");
+        assert_eq!(syllable("q", "üan"), "quan");
+        assert_eq!(syllable("x", "ün"), "xun");
+        assert_eq!(syllable("n", "ü"), "nü");
+        assert_eq!(syllable("l", "üe"), "lüe");
+        assert_eq!(with_tone("jue", 4), "juè");
+        assert_eq!(with_tone("lüe", 4), "lüè");
     }
 }
