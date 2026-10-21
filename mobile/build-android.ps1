@@ -1,4 +1,4 @@
-# Build the Android APK for pinyin-study-mobile.
+﻿# Build the Android APK for pinyin-study-mobile.
 #
 #   .\build-android.ps1                    # arm64 debug APK
 #   .\build-android.ps1 -Abi x86_64        # emulator
@@ -39,6 +39,24 @@ try {
 
     $api = 26
     $abis = if ($Abi -eq "all") { @("arm64-v8a", "x86_64") } else { @($Abi) }
+
+    # 上次为别的架构留下的 .so 会被 gradle 一起打进包，先清掉
+    $jniLibs = Join-Path $here "android\app\src\main\jniLibs"
+    Get-ChildItem $jniLibs -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $abis -notcontains $_.Name } |
+        Remove-Item -Recurse -Force
+
+    # release 用本机 debug 签名，keystore 不存在时先造一个
+    if ($Release) {
+        $keystore = Join-Path $HOME ".android\debug.keystore"
+        if (-not (Test-Path $keystore)) {
+            Write-Host "==> keytool -genkeypair $keystore"
+            & keytool -genkeypair -v -keystore $keystore -storepass android -keypass android `
+                -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 `
+                -dname "CN=Android Debug,O=Android,C=US"
+            if ($LASTEXITCODE -ne 0) { throw "keytool failed" }
+        }
+    }
 
     $targets = @{
         "arm64-v8a" = @{ Rust = "aarch64-linux-android"; Cc = "aarch64-linux-android$api"; Env = "AARCH64_LINUX_ANDROID" }
@@ -93,7 +111,7 @@ try {
     }
 
     $task = if ($Release) { "assembleRelease" } else { "assembleDebug" }
-    & "android/gradlew.bat" -p android $task
+    & "android/gradlew.bat" -p android $task "-Pabis=$($abis -join ',')"
     if ($LASTEXITCODE -ne 0) { throw "gradle $task failed" }
 
     $apk = Get-ChildItem "android/app/build/outputs/apk" -Recurse -Filter "*.apk" |

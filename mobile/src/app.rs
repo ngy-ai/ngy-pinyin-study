@@ -1,4 +1,4 @@
-//! 手机端界面：认一认、拼一拼、家长教辅。
+//! 手机端界面：认一认、拼一拼、玩一玩、家长教辅。
 //!
 //! 布局按竖屏手机来：一屏一个主任务，点按目标 ≥ 44px，尽量少滚动。
 
@@ -9,16 +9,17 @@ use gpui::*;
 use crate::{audio, pinyin, theme};
 
 const TONE_NAMES: [&str; 4] = ["一声", "二声", "三声", "四声"];
-const TAB_NAMES: [&str; 3] = ["认一认", "拼一拼", "家长"];
+const TAB_NAMES: [&str; 4] = ["认一认", "拼一拼", "玩一玩", "家长"];
 
 pub struct PinyinApp {
-    /// 0 = 认一认，1 = 拼一拼，2 = 家长教辅
+    /// 0 = 认一认，1 = 拼一拼，2 = 玩一玩，3 = 家长教辅
     tab: usize,
     /// 认一认里的分类：声母 / 韵母 / 整体认读
     learn_tab: usize,
     learn_index: usize,
     blend_initial: &'static str,
     blend_final: &'static str,
+    quiz: QuizState,
     scroll: ScrollHandle,
 }
 
@@ -30,8 +31,102 @@ impl PinyinApp {
             learn_index: 0,
             blend_initial: "b",
             blend_final: "a",
+            quiz: QuizState::new(),
             scroll: ScrollHandle::new(),
         }
+    }
+}
+
+// ── 玩一玩 ──────────────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy)]
+struct Question {
+    blend: &'static pinyin::Blend,
+    /// 正确声调在 `blend.tones` 里的下标
+    tone: usize,
+    /// 打乱后的四个选项（同一个音节的四个声调）
+    options: [&'static str; 4],
+    correct: usize,
+}
+
+struct QuizState {
+    total: usize,
+    index: usize,
+    score: usize,
+    question: Option<Question>,
+    chosen: Option<usize>,
+    wrong: Option<usize>,
+    finished: bool,
+    rng: pinyin::Rng,
+}
+
+impl QuizState {
+    fn new() -> Self {
+        let mut state = Self {
+            total: 10,
+            index: 0,
+            score: 0,
+            question: None,
+            chosen: None,
+            wrong: None,
+            finished: false,
+            rng: pinyin::Rng::from_time(),
+        };
+        state.question = state.pick();
+        state
+    }
+
+    fn pick(&mut self) -> Option<Question> {
+        let pool = pinyin::quiz_blends();
+        if pool.is_empty() {
+            return None;
+        }
+        let blend = pool[self.rng.below(pool.len())];
+        let tone = self.rng.below(blend.tones.len());
+        let mut order = [0usize, 1, 2, 3];
+        self.rng.shuffle(&mut order);
+        let options = [
+            blend.tones[order[0]].0,
+            blend.tones[order[1]].0,
+            blend.tones[order[2]].0,
+            blend.tones[order[3]].0,
+        ];
+        let correct = order.iter().position(|&t| t == tone).unwrap_or(0);
+        Some(Question {
+            blend,
+            tone,
+            options,
+            correct,
+        })
+    }
+
+    fn advance(&mut self) {
+        if self.index + 1 >= self.total {
+            self.finished = true;
+            self.chosen = None;
+            self.wrong = None;
+            return;
+        }
+        self.index += 1;
+        self.chosen = None;
+        self.wrong = None;
+        self.question = self.pick();
+    }
+
+    fn restart(&mut self) {
+        self.index = 0;
+        self.score = 0;
+        self.chosen = None;
+        self.wrong = None;
+        self.finished = false;
+        self.question = self.pick();
+    }
+
+    /// 当前题目要播的音：(音节, 声调, 汉字)
+    fn audio(&self) -> Option<(&'static str, u8, &'static str)> {
+        let question = self.question?;
+        let (marked, hanzi) = question.blend.tones[question.tone];
+        Some((question.blend.plain, pinyin::tone_number(marked).max(1), hanzi))
     }
 }
 
@@ -41,7 +136,8 @@ impl Render for PinyinApp {
             .size_full()
             .bg(rgb(theme::BG))
             .px(px(16.))
-            .pt(px(20.))
+            // 状态栏高度 + 一点呼吸空间
+            .pt(px(crate::insets::top() + 12.))
             .pb(px(10.))
             .gap(px(12.))
             .child(self.header())
@@ -49,6 +145,7 @@ impl Render for PinyinApp {
             .child(match self.tab {
                 0 => self.learn(cx),
                 1 => self.blend(cx),
+                2 => self.quiz(cx),
                 _ => self.guide(),
             })
     }
@@ -121,6 +218,12 @@ impl PinyinApp {
                     .child(*name)
                     .on_click(cx.listener(move |this, _: &ClickEvent, _window, cx| {
                         this.tab = i;
+                        // 进玩一玩就直接把题目念出来，不用先找喇叭
+                        if i == 2
+                            && let Some((plain, tone, _)) = this.quiz.audio()
+                        {
+                            audio::play_tone(plain, tone);
+                        }
                         cx.notify();
                     })),
             );
@@ -375,6 +478,46 @@ impl PinyinApp {
             );
         }
 
+        let mut kinds = row().gap(px(8.));
+        for (i, (name, letters)) in pinyin::TABS.iter().enumerate() {
+            let selected = i == tab;
+            let palette = theme::accent(1);
+            kinds = kinds.child(
+                div()
+                    .id(format!("learn-kind-{i}"))
+                    .flex_1()
+                    .h(px(38.))
+                    .rounded_full()
+                    .border_1()
+                    .border_color(rgb(if selected {
+                        palette
+                    } else {
+                        theme::LINE
+                    }))
+                    .bg(rgb(if selected {
+                        palette
+                    } else {
+                        theme::PAPER
+                    }))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgb(if selected { 0xFFFFFF } else { theme::MUTED }))
+                    .child(format!("{name} {}", letters.len()))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _window, cx| {
+                        this.learn_tab = i;
+                        this.learn_index = 0;
+                        this.scroll.set_offset(point(px(0.), px(0.)));
+                        if let Some(letter) = pinyin::TABS[i].1.first() {
+                            audio::play_letter(letter.text);
+                        }
+                        cx.notify();
+                    })),
+            );
+        }
+
         col()
             .id("learn-scroll")
             .flex_1()
@@ -382,6 +525,7 @@ impl PinyinApp {
             .gap(px(12.))
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
+            .child(kinds)
             .child(card)
             .child(nav)
             .child(chips)
@@ -584,10 +728,11 @@ impl PinyinApp {
     // ── 家长教辅 ────────────────────────────────────────────────────────────
 
     fn guide(&self) -> AnyElement {
-        let mut list = col().gap(px(10.));
+        let mut list = col().w_full().gap(px(10.));
         for (i, (title, body)) in pinyin::HOW_TO.iter().enumerate() {
             list = list.child(
                 row()
+                    .w_full()
                     .items_start()
                     .gap(px(10.))
                     .child(
@@ -606,9 +751,11 @@ impl PinyinApp {
                     .child(
                         col()
                             .flex_1()
+                            .min_w(px(0.))
                             .gap(px(2.))
                             .child(
                                 div()
+                                    .w_full()
                                     .text_size(px(14.))
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(rgb(theme::INK))
@@ -616,6 +763,7 @@ impl PinyinApp {
                             )
                             .child(
                                 div()
+                                    .w_full()
                                     .text_size(px(12.))
                                     .line_height(px(18.))
                                     .text_color(rgb(theme::MUTED))
@@ -628,6 +776,7 @@ impl PinyinApp {
         col()
             .id("guide-scroll")
             .flex_1()
+            .w_full()
             .min_h(px(0.))
             .gap(px(10.))
             .overflow_y_scroll()
@@ -657,6 +806,291 @@ impl PinyinApp {
                             .font_weight(FontWeight::BOLD)
                             .text_color(rgb(theme::accent(2)))
                             .child(pinyin::BLEND_RHYME),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    // ── 玩一玩 ──────────────────────────────────────────────────────────────
+
+    fn quiz(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.quiz.finished {
+            return self.quiz_result(cx);
+        }
+        let Some(question) = self.quiz.question else {
+            return col()
+                .child(div().text_color(rgb(theme::MUTED)).child("题目还没有准备好"))
+                .into_any_element();
+        };
+
+        let chosen = self.quiz.chosen;
+        let wrong = self.quiz.wrong;
+        let (marked, hanzi) = question.blend.tones[question.tone];
+        let pinyin_text = marked;
+        let plain = question.blend.plain;
+        let tone_no = pinyin::tone_number(marked).max(1);
+
+        let top = row()
+            .items_center()
+            .gap(px(8.))
+            .child(
+                div()
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgb(theme::MUTED))
+                    .child(format!(
+                        "第 {} / {} 题",
+                        (self.quiz.index + 1).min(self.quiz.total),
+                        self.quiz.total
+                    )),
+            )
+            .child(div().flex_1())
+            .child(
+                div()
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgb(theme::accent(1)))
+                    .child(format!("答对 {} 题", self.quiz.score)),
+            );
+
+        let speaker = div()
+            .id("quiz-speak")
+            .size(px(60.))
+            .rounded_full()
+            .bg(rgb(theme::accent(2)))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_size(px(26.))
+            .text_color(rgb(0xFFFFFF))
+            .child("♪")
+            .on_click(cx.listener(move |_this, _: &ClickEvent, _window, _cx| {
+                audio::play_tone(plain, tone_no);
+            }));
+
+        let prompt = row()
+            .items_center()
+            .gap(px(12.))
+            .child(
+                div()
+                    .flex_none()
+                    .size(px(76.))
+                    .rounded_2xl()
+                    .bg(rgb(theme::soft(1)))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(44.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgb(theme::accent(1)))
+                    .child(hanzi),
+            )
+            .child(
+                col()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .gap(px(3.))
+                    .child(
+                        div()
+                            .w_full()
+                            .text_size(px(16.))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(rgb(theme::INK))
+                            .child("听一听，选出正确的拼音"),
+                    )
+                    .child(
+                        div()
+                            .w_full()
+                            .text_size(px(12.))
+                            .text_color(rgb(theme::MUTED))
+                            .child("点喇叭可以再听一次"),
+                    ),
+            )
+            .child(speaker);
+
+        let mut options = col().gap(px(8.));
+        for line in 0..2 {
+            let mut row_ = row().gap(px(8.));
+            for slot in 0..2 {
+                let i = line * 2 + slot;
+                let is_correct = i == question.correct;
+                let is_chosen = chosen == Some(i);
+                let is_wrong = wrong == Some(i);
+
+                let (bg, border, fg) = if is_chosen || (chosen.is_some() && is_correct) {
+                    (0xE3F7EC, 0x2E8B57, 0x1E7A4B)
+                } else if is_wrong {
+                    (0xFCE9E5, 0xC0503C, 0xB03A28)
+                } else {
+                    (theme::PAPER, theme::LINE, theme::INK)
+                };
+
+                row_ = row_.child(
+                    div()
+                        .id(format!("quiz-option-{i}"))
+                        .flex_1()
+                        .h(px(84.))
+                        .rounded_2xl()
+                        .border_2()
+                        .border_color(rgb(border))
+                        .bg(rgb(bg))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_size(px(30.))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(rgb(fg))
+                        .child(question.options[i])
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _window, cx| {
+                            if this.quiz.chosen.is_some() {
+                                return;
+                            }
+                            let Some(q) = this.quiz.question else {
+                                return;
+                            };
+                            if i == q.correct {
+                                this.quiz.chosen = Some(i);
+                                this.quiz.wrong = None;
+                                this.quiz.score += 1;
+                                audio::play_tone(q.blend.plain, pinyin::tone_number(q.blend.tones[q.tone].0).max(1));
+                            } else {
+                                this.quiz.wrong = Some(i);
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            options = options.child(row_);
+        }
+
+        let feedback = if chosen.is_some() {
+            row()
+                .items_center()
+                .gap(px(10.))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(0.))
+                        .text_size(px(14.))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(rgb(0x1E7A4B))
+                        .child(format!("读作 {pinyin_text}，真棒！")),
+                )
+                .child(
+                    div()
+                        .id("quiz-next")
+                        .px(px(18.))
+                        .h(px(44.))
+                        .rounded_full()
+                        .bg(rgb(theme::accent(1)))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_size(px(14.))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(rgb(0xFFFFFF))
+                        .child(if self.quiz.index + 1 >= self.quiz.total {
+                            "看看结果"
+                        } else {
+                            "下一题"
+                        })
+                        .on_click(cx.listener(|this, _: &ClickEvent, _window, cx| {
+                            this.quiz.advance();
+                            if let Some((plain, tone, _)) = this.quiz.audio() {
+                                audio::play_tone(plain, tone);
+                            }
+                            cx.notify();
+                        })),
+                )
+        } else if wrong.is_some() {
+            div()
+                .text_size(px(14.))
+                .font_weight(FontWeight::BOLD)
+                .text_color(rgb(0xB03A28))
+                .child("差一点点，再听一次吧")
+        } else {
+            div()
+                .text_size(px(13.))
+                .text_color(rgb(theme::MUTED))
+                .child("先点一下喇叭，听清楚声调再选")
+        };
+
+        col()
+            .id("quiz-page")
+            .flex_1()
+            .min_h(px(0.))
+            .gap(px(12.))
+            .child(top)
+            .child(
+                col()
+                    .bg(rgb(theme::PAPER))
+                    .rounded_2xl()
+                    .p(px(16.))
+                    .gap(px(14.))
+                    .child(prompt)
+                    .child(options)
+                    .child(feedback),
+            )
+            .into_any_element()
+    }
+
+    fn quiz_result(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let score = self.quiz.score;
+        let total = self.quiz.total;
+        col()
+            .id("quiz-result")
+            .flex_1()
+            .min_h(px(0.))
+            .gap(px(12.))
+            .child(
+                col()
+                    .flex_1()
+                    .bg(rgb(theme::PAPER))
+                    .rounded_2xl()
+                    .p(px(20.))
+                    .gap(px(14.))
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        div()
+                            .text_size(px(40.))
+                            .text_color(rgb(theme::accent(0)))
+                            .child("★"),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(24.))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(rgb(theme::INK))
+                            .child("全部答完啦！"),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(15.))
+                            .text_color(rgb(theme::MUTED))
+                            .child(format!("这一轮答对 {score} 题，共 {total} 题")),
+                    )
+                    .child(
+                        div()
+                            .id("quiz-restart")
+                            .px(px(24.))
+                            .h(px(48.))
+                            .rounded_full()
+                            .bg(rgb(theme::accent(1)))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(15.))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(rgb(0xFFFFFF))
+                            .child("再玩一次")
+                            .on_click(cx.listener(|this, _: &ClickEvent, _window, cx| {
+                                this.quiz.restart();
+                                if let Some((plain, tone, _)) = this.quiz.audio() {
+                                    audio::play_tone(plain, tone);
+                                }
+                                cx.notify();
+                            })),
                     ),
             )
             .into_any_element()

@@ -1,6 +1,6 @@
 # 拼音乐园
 
-一个给幼儿（3–6 岁）用的拼音学习应用，家长在旁边陪着一起用。桌面端使用 [gpui-kit](https://gpui-kit.com)（Rust + GPUI）构建；手机端在 [`mobile/`](mobile/README.md)，使用 [gpui-mobile](https://github.com/itsbalamurali/gpui-mobile) 构建，两端共用 `src/pinyin.rs` 的拼音数据。
+一个给幼儿（3–6 岁）用的拼音学习应用，家长在旁边陪着一起用。桌面端在 [`desktop/`](desktop)，使用 [gpui-kit](https://gpui-kit.com)（Rust + GPUI）构建；手机端在 [`mobile/`](mobile/README.md)，使用 [gpui-mobile](https://github.com/itsbalamurali/gpui-mobile) 构建。两端共用 [`shared/`](shared) 里 `pinyin-core` crate 的拼音数据和根目录 `assets/audio` 的录音。
 
 ## 功能
 
@@ -38,11 +38,17 @@
 ## 运行
 
 ```bash
+cd desktop
 cargo run
-# 跑测试：标调规则 + 每个音是否都有录音
+# 测试录音覆盖（每个字母、每个韵母四声都有对应 mp3）
+cargo test
+
+cd ../shared
+# 测试标调规则、拼读表等纯数据逻辑
 cargo test
 ```
 
+`desktop/`、`mobile/`、`shared/` 各是一个独立 workspace，在仓库根直接 `cargo run` 不行。
 首次构建会编译 GPUI 依赖，需要几分钟。
 
 ### 环境要求
@@ -51,10 +57,19 @@ cargo test
 - Visual Studio 2022 生成工具（含 C++ 桌面开发）和 CMake
 - 想听机器人声兜底才需要中文语音包（Windows「设置 → 时间和语言 → 语音 → 管理语音」）
 
+## 目录
+
+```
+desktop/   # 桌面端（gpui-kit + GPUI），独立 workspace
+mobile/    # 手机端（gpui-mobile + NativeActivity），独立 workspace
+shared/    # pinyin-core：拼音数据、标调规则，两端共用的普通 crate
+assets/    # 两端共用的录音（rust-embed 在编译期嵌进各自的二进制）
+```
+
 ## 手机端
 
 `mobile/` 是一个独立 workspace（不影响桌面端的依赖和构建时间），用 gpui-mobile
-把认一认、拼一拼、家长教辅三页做成竖屏界面，拼音数据直接引用 `src/pinyin.rs`。
+把认一认、拼一拼、家长教辅三页做成竖屏界面，拼音数据直接依赖 `pinyin-core`。
 
 ```powershell
 cd mobile
@@ -66,17 +81,25 @@ cd mobile
 ## 代码结构
 
 ```
-src/
-├── main.rs        # 入口、窗口、页面路由、顶栏与左侧导航
-├── pinyin.rs      # 拼音数据、标调规则、家长教辅文案、抽题用的小随机数
-├── audio.rs       # 录音播放（MCI）+ 语音合成兜底（SAPI5），后台线程
-├── ui.rs          # 幼儿友好的配色与通用小部件
-└── pages/
-    ├── learn.rs   # 认一认（含四声练习）
-    ├── blend.rs   # 拼一拼
-    ├── quiz.rs    # 玩一玩
-    └── guide.rs   # 家长教辅
+shared/
+├── Cargo.toml
+└── src/lib.rs         # pinyin-core：拼音数据、标调规则、家长教辅文案、抽题用的小随机数
+
+desktop/
+├── Cargo.toml
+└── src/
+    ├── main.rs        # 入口、窗口、页面路由、顶栏与左侧导航
+    ├── audio.rs       # 录音播放（MCI）+ 语音合成兜底（SAPI5），后台线程
+    ├── ui.rs          # 幼儿友好的配色与通用小部件
+    └── pages/
+        ├── learn.rs   # 认一认（含四声练习）
+        ├── blend.rs   # 拼一拼
+        ├── quiz.rs    # 玩一玩
+        └── guide.rs   # 家长教辅
 ```
+
+两端都是 `use pinyin_core as pinyin;` 起个别名，所以下面提到的 `pinyin::with_tone`、
+`pinyin::BLENDS` 这类写法在两边代码里原样成立。
 
 - 页面状态集中放在 `AppView` / `AppPages` 里，每个页面都是 `impl AppView` 上的渲染方法，避免多 Entity 来回传状态。
 - 标调（`pinyin::with_tone`）按「有 a/o/e 标 a/o/e，否则标靠后的 i/u」的规则算，不手写 96 个带调字符串。

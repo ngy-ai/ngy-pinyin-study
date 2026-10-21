@@ -1,0 +1,11 @@
+[package]
+name = "pinyin-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "拼音数据：声母、韵母、整体认读音节、拼读组合与标调规则（桌面端和手机端共用）"
+
+# 独立 workspace：不依赖任何外部 crate，也不想被谁带进依赖树
+[workspace]
+
+[dependencies]

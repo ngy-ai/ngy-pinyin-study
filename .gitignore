@@ -1,1 +1,2 @@
-/target
+# 三个独立 workspace 的构建缓存，外加 IDE 在根目录跑的 flycheck
+target/

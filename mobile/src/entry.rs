@@ -41,6 +41,7 @@ mod android {
         log::info!("android_main: 启动");
 
         let _platform = jni::init_platform(&app);
+        crate::insets::init();
 
         let Some(shared) = jni::shared_platform() else {
             log::error!("shared_platform() 为空，无法启动 GPUI");
