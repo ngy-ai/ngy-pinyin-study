@@ -37,18 +37,18 @@
 
 ## 运行
 
-```bash
-cd desktop
-cargo run
-# 测试录音覆盖（每个字母、每个韵母四声都有对应 mp3）
-cargo test
+根目录是一个 Cargo workspace，默认成员是桌面端：
 
-cd ../shared
-# 测试标调规则、拼读表等纯数据逻辑
+```bash
+# 在仓库根直接跑桌面端（default-members = desktop）
+cargo run
+
+# 桌面端测试：录音覆盖（每个字母、每个韵母四声都有对应 mp3）
 cargo test
+# 纯数据测试：标调规则、拼读表
+cargo test -p pinyin-core
 ```
 
-`desktop/`、`mobile/`、`shared/` 各是一个独立 workspace，在仓库根直接 `cargo run` 不行。
 首次构建会编译 GPUI 依赖，需要几分钟。
 
 ### 环境要求
@@ -60,16 +60,18 @@ cargo test
 ## 目录
 
 ```
-desktop/   # 桌面端（gpui-kit + GPUI），独立 workspace
-mobile/    # 手机端（gpui-mobile + NativeActivity），独立 workspace
-shared/    # pinyin-core：拼音数据、标调规则，两端共用的普通 crate
+Cargo.toml # workspace 根：members = desktop / mobile / shared，默认成员是 desktop
+desktop/   # 桌面端（gpui-kit + GPUI）
+mobile/    # 手机端（gpui-mobile + NativeActivity）
+shared/    # pinyin-core：拼音数据、标调规则，两端共用
 assets/    # 两端共用的录音（rust-embed 在编译期嵌进各自的二进制）
 ```
 
 ## 手机端
 
-`mobile/` 是一个独立 workspace（不影响桌面端的依赖和构建时间），用 gpui-mobile
-把认一认、拼一拼、家长教辅三页做成竖屏界面，拼音数据直接依赖 `pinyin-core`。
+`mobile/` 是 workspace 里的另一个成员，用 gpui-mobile 把认一认、拼一拼、家长教辅
+三页做成竖屏界面，拼音数据直接依赖 `pinyin-core`。它的依赖只在 Android 目标下生效，
+不会拖累桌面端的构建。
 
 ```powershell
 cd mobile

@@ -91,7 +91,8 @@ try {
 
         $out = Join-Path $here "android\app\src\main\jniLibs\$abi"
         New-Item -ItemType Directory -Force $out | Out-Null
-        $so = "target\$($t.Rust)\$profileDir\libpinyin_study_mobile.so"
+        # mobile 是根 workspace 的成员，产物落在外层的 target/ 里
+        $so = Join-Path $here "..\target\$($t.Rust)\$profileDir\libpinyin_study_mobile.so"
         if (-not (Test-Path $so)) { throw "missing $so" }
         Copy-Item $so $out -Force
 

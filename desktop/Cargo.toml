@@ -17,34 +17,4 @@ windows = { version = "0.62.2", features = [
     "Win32_System_Com",
 ] }
 
-# Debug 构建下 GPUI 与组件库几乎没优化，跑起来会卡；
-# 只把框架依赖按 opt-level 3 编译，自己的代码仍然保持 Debug。
-[profile.dev.package.gpui-pre]
-opt-level = 3
-
-[profile.dev.package.gpui-pre-platform]
-opt-level = 3
-
-[profile.dev.package.gpui-pre-macros]
-opt-level = 3
-
-[profile.dev.package.gpui-base]
-opt-level = 3
-
-[profile.dev.package.gpui-kit]
-opt-level = 3
-
-[profile.dev.package.gpui-kit-assets]
-opt-level = 3
-
-[profile.dev.package.gpui-component]
-opt-level = 3
-
-[profile.dev.package.rustybuzz]
-opt-level = 3
-
-[profile.dev.package.taffy]
-opt-level = 3
-
-[profile.dev.package.ttf-parser]
-opt-level = 3
+# GPUI 系的 opt-level 覆盖统一放在根 Cargo.toml 的 profile 段里。

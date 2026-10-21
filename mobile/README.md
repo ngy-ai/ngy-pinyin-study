@@ -21,8 +21,7 @@
 
 ```
 mobile/
-  Cargo.toml          # 独立 workspace，不影响桌面端的依赖
-  .cargo/config.toml  # RUST_FONTCONFIG_DLOPEN，Android 交叉编译必需
+  Cargo.toml          # 根 workspace 的成员；Android 依赖与桌面端互不干扰
   src/lib.rs          # 模块组织，拼音数据依赖 ../shared 的 pinyin-core
   src/app.rs          # 三页界面（只依赖 gpui 的 div API）
   src/theme.rs        # 和桌面端同一套暖色

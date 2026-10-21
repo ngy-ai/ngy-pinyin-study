@@ -1,0 +1,91 @@
+# 仓库根：一个 workspace 管三个 crate。
+#
+# desktop 是默认成员，所以在根目录直接 `cargo run` / `cargo test` 就是桌面端；
+# 想跑别的用 `-p pinyin-study-mobile` / `-p pinyin-core`，
+# 或者 `cargo test --workspace` 一次跑完。
+[workspace]
+resolver = "3"
+members = ["desktop", "mobile", "shared"]
+default-members = ["desktop"]
+# 注意：mobile/vendor/gpui-mobile 这种 workspace 内的 path 依赖会被 cargo 自动收编成成员，
+# exclude 管不住它（试过，无效）。所以在那份 vendored Cargo.toml 里关掉了它自己的测试，
+# 免得 `cargo test --workspace` 把那 92 个测试一起跑。
+
+# Android 的 libc 没有 ENOATTR，xattr 0.2.3 编不过；
+# gpui → http_client → async-tar 在 unix 下会调它，这里换成空实现。
+# patch 只在 workspace 根生效，所以必须放在这里而不是 mobile/Cargo.toml。
+[patch.crates-io]
+xattr = { path = "mobile/vendor/xattr" }
+
+# ── profile ──────────────────────────────────────────────────────────────────
+# 这些原先分散在两个成员的 Cargo.toml 里，一旦成为非根包就会被忽略，
+# 所以统一搬到根（对整个 workspace 生效）。
+
+# 模拟器的 Vulkan 驱动（vulkan.ranchu.so）在 vkSetDebugUtilsObjectNameEXT 上会崩。
+# wgpu 只有在开了 debug_assertions 时才会带 DEBUG flag 去给对象起名字，
+# 所以把 wgpu 系列依赖的 debug assertions 关掉（我们自己的 crate 仍然保留）。
+#
+# 这里必须逐个列，不能写 "*"：那条规则会连 rust-embed 一起关掉，
+# 而它的 derive 宏是看「调用方 crate」的 debug_assertions 生成
+# Filenames::Dynamic / Embedded 的，库和调用方对不上就直接编译失败（E0599）。
+[profile.dev.package.wgpu]
+debug-assertions = false
+
+[profile.dev.package.wgpu-core]
+debug-assertions = false
+
+[profile.dev.package.wgpu-core-deps-apple]
+debug-assertions = false
+
+[profile.dev.package.wgpu-core-deps-emscripten]
+debug-assertions = false
+
+[profile.dev.package.wgpu-core-deps-wasm]
+debug-assertions = false
+
+[profile.dev.package.wgpu-core-deps-windows-linux-android]
+debug-assertions = false
+
+[profile.dev.package.wgpu-hal]
+debug-assertions = false
+
+[profile.dev.package.wgpu-naga-bridge]
+debug-assertions = false
+
+[profile.dev.package.wgpu-types]
+debug-assertions = false
+
+[profile.dev.package.naga]
+debug-assertions = false
+
+# Debug 构建下 GPUI 与组件库几乎没优化，跑起来会卡；
+# 只把框架依赖按 opt-level 3 编译，自己的代码仍然保持 Debug。
+[profile.dev.package.gpui-pre]
+opt-level = 3
+
+[profile.dev.package.gpui-pre-platform]
+opt-level = 3
+
+[profile.dev.package.gpui-pre-macros]
+opt-level = 3
+
+[profile.dev.package.gpui-base]
+opt-level = 3
+
+[profile.dev.package.gpui-kit]
+opt-level = 3
+
+[profile.dev.package.gpui-kit-assets]
+opt-level = 3
+
+[profile.dev.package.gpui-component]
+opt-level = 3
+
+[profile.dev.package.rustybuzz]
+opt-level = 3
+
+[profile.dev.package.taffy]
+opt-level = 3
+
+[profile.dev.package.ttf-parser]
+opt-level = 3

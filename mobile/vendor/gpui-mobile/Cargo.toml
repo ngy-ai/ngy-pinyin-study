@@ -57,6 +57,10 @@ media_session = []
 
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]
+# 它会被根 workspace 自动收编成成员（exclude 管不住），关掉自带测试，
+# 免得 `cargo test --workspace` 去跑那 92 个依赖 Android 环境的测试。
+test = false
+doctest = false
 
 # ── shared deps (all platforms) ──────────────────────────────────────────────
 

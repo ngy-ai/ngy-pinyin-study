@@ -9,14 +9,6 @@ description = "拼音乐园手机端（gpui-mobile / Android）"
 name = "pinyin_study_mobile"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
-# 独立工作区：桌面端不会因为这里的 git 依赖变慢
-[workspace]
-
-# Android 的 libc 没有 ENOATTR，xattr 0.2.3 编不过；
-# gpui → http_client → async-tar 在 unix 下会调它，这里换成空实现。
-[patch.crates-io]
-xattr = { path = "vendor/xattr" }
-
 # ── 手机端：gpui-mobile 提供 iOS/Android 的 Platform 实现 ────────────────────
 # gpui-mobile 的正式实现还没发到 crates.io（0.1.0 是占位），只能走源码；
 # 它固定要求 Zed 仓库这个 rev 的 gpui，两者必须一致，否则类型不匹配。
@@ -47,19 +39,3 @@ rust-embed = { version = "8", features = ["debug-embed"] }
 # 同一份界面代码就能在 Windows 上 `cargo check`，不必等真机。
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 gpui-pre = "0.3.9"
-
-# 模拟器的 Vulkan 驱动（vulkan.ranchu.so）在 vkSetDebugUtilsObjectNameEXT 上会崩。
-# wgpu 只有在开了 debug_assertions 时才会带 DEBUG flag 去给对象起名字，
-# 所以关掉依赖的 debug assertions（我们自己的 crate 仍然保留）。
-# release 构建本来就没有这个 flag，不受影响。
-[profile.dev.package."*"]
-debug-assertions = false
-
-[profile.dev.package.gpui-pre]
-opt-level = 3
-
-[profile.dev.package.taffy]
-opt-level = 3
-
-[profile.dev.package.rustybuzz]
-opt-level = 3
