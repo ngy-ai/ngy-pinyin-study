@@ -1,0 +1,45 @@
+[package]
+name = "pinyin-study-mobile"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "拼音乐园手机端（gpui-mobile / Android）"
+
+[lib]
+name = "pinyin_study_mobile"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+# 独立工作区：桌面端不会因为这里的 git 依赖变慢
+[workspace]
+
+# Android 的 libc 没有 ENOATTR，xattr 0.2.3 编不过；
+# gpui → http_client → async-tar 在 unix 下会调它，这里换成空实现。
+[patch.crates-io]
+xattr = { path = "vendor/xattr" }
+
+# ── 手机端：gpui-mobile 提供 iOS/Android 的 Platform 实现 ────────────────────
+# gpui-mobile 的正式实现还没发到 crates.io（0.1.0 是占位），只能走 git；
+# 它固定要求 Zed 仓库这个 rev 的 gpui，两者必须一致，否则类型不匹配。
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+gpui = { git = "https://github.com/zed-industries/zed", rev = "5688167d224b5eca54875d49afb8bfd73a07915a", package = "gpui", default-features = false }
+gpui-mobile = { git = "https://github.com/itsbalamurali/gpui-mobile" }
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+android_logger = "0.15"
+
+# ── 桌面端只用来做类型检查 ──────────────────────────────────────────────────
+# gpui-pre 是 Zed gpui 的发布版镜像，API 基本一致；把包名重命名成 gpui，
+# 同一份界面代码就能在 Windows 上 `cargo check`，不必等真机。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+gpui-pre = "0.3.9"
+
+[profile.dev.package.gpui-pre]
+opt-level = 3
+
+[profile.dev.package.taffy]
+opt-level = 3
+
+[profile.dev.package.rustybuzz]
+opt-level = 3

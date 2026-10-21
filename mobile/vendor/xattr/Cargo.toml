@@ -1,0 +1,10 @@
+[package]
+name = "xattr"
+version = "0.2.3"
+edition = "2021"
+description = "Android-friendly no-op shim for the xattr crate (see mobile/vendor/xattr/src/lib.rs)"
+publish = false
+
+[lib]
+name = "xattr"
+path = "src/lib.rs"

@@ -1,0 +1,4 @@
+# 交叉编译到 Android 时系统里没有 fontconfig，
+# 让 yeslogic-fontconfig-sys 走 dlopen，否则 build script 直接失败。
+[env]
+RUST_FONTCONFIG_DLOPEN = "on"

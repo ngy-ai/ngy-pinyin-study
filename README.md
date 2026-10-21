@@ -1,6 +1,6 @@
 # 拼音乐园
 
-一个给幼儿（3–6 岁）用的拼音学习桌面应用，家长在旁边陪着一起用。使用 [gpui-kit](https://gpui-kit.com)（Rust + GPUI）构建。
+一个给幼儿（3–6 岁）用的拼音学习应用，家长在旁边陪着一起用。桌面端使用 [gpui-kit](https://gpui-kit.com)（Rust + GPUI）构建；手机端在 [`mobile/`](mobile/README.md)，使用 [gpui-mobile](https://github.com/itsbalamurali/gpui-mobile) 构建，两端共用 `src/pinyin.rs` 的拼音数据。
 
 ## 功能
 
@@ -50,6 +50,18 @@ cargo test
 - Rust 1.92+（MSVC 工具链），Windows 10+
 - Visual Studio 2022 生成工具（含 C++ 桌面开发）和 CMake
 - 想听机器人声兜底才需要中文语音包（Windows「设置 → 时间和语言 → 语音 → 管理语音」）
+
+## 手机端
+
+`mobile/` 是一个独立 workspace（不影响桌面端的依赖和构建时间），用 gpui-mobile
+把认一认、拼一拼、家长教辅三页做成竖屏界面，拼音数据直接引用 `src/pinyin.rs`。
+
+```powershell
+cd mobile
+.\build-android.ps1
+```
+
+详见 [mobile/README.md](mobile/README.md)。目前只有 Android 打包验证过，声音还是空实现。
 
 ## 代码结构
 
