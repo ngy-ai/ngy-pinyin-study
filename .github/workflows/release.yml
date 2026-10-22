@@ -1,0 +1,171 @@
+name: release
+
+# 打 tag（v0.1.0）时三端一起构建，产物挂到对应的 GitHub Release 上。
+# 也可以在 Actions 页面手动指定一个已有 tag 重跑。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已有的 tag（例如 v0.1.0）"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  android:
+    name: Android (arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - name: 安装 Android 目标
+        run: rustup target add aarch64-linux-android
+
+      - name: 安装 cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      # 产物写到 mobile/android/app/src/main/jniLibs，Gradle 会打进去；
+      # 这里不用 NDK 直接编，交给 cargo-ndk 处理 minSdk 26 的 clang 链接参数。
+      - name: 交叉编译 Rust 库
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          cargo ndk -t arm64-v8a -o mobile/android/app/src/main/jniLibs build --release -p pinyin-study-mobile
+
+      # build.gradle.kts 里的 release 用的是本机 debug 签名，CI 上没有，先造一个
+      - name: 生成 debug keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkeypair -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: 打 release APK
+        run: |
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew assembleRelease -Pabis=arm64-v8a --no-daemon
+
+      - name: 重命名产物
+        run: cp mobile/android/app/build/outputs/apk/release/app-release.apk pinyin-study-android-arm64.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: pinyin-study-android-arm64.apk
+          if-no-files-found: error
+
+  windows:
+    name: Windows (x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows
+
+      - name: 编译
+        run: cargo build --release -p pinyin-study
+
+      # 录音是 rust-embed 编进二进制的，单独一个 exe 就能跑
+      - name: 打包
+        run: Compress-Archive -Path target/release/pinyin-study.exe -DestinationPath pinyin-study-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: pinyin-study-windows-x64.zip
+          if-no-files-found: error
+
+  macos:
+    name: macOS (${{ runner.arch }})
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos
+
+      - name: 编译
+        run: cargo build --release -p pinyin-study
+
+      # GPUI 在 macOS 上要靠 .app bundle 才能正常拿到焦点和 Dock 图标
+      - name: 组装 .app
+        run: |
+          set -euo pipefail
+          APP=dist/PinyinStudy.app
+          mkdir -p "$APP/Contents/MacOS"
+          cp target/release/pinyin-study "$APP/Contents/MacOS/PinyinStudy"
+          chmod +x "$APP/Contents/MacOS/PinyinStudy"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>PinyinStudy</string>
+            <key>CFBundleDisplayName</key><string>拼音乐园</string>
+            <key>CFBundleIdentifier</key><string>com.ngy.pinyin</string>
+            <key>CFBundleExecutable</key><string>PinyinStudy</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>0.1.0</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          ditto -c -k --keepParent "$APP" "pinyin-study-macos-${RUNNER_ARCH}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: pinyin-study-macos-*.zip
+          if-no-files-found: error
+
+  publish:
+    name: 挂到 Release
+    needs: [android, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: 拼音乐园 ${{ inputs.tag || github.ref_name }}
+          files: dist/*
+          fail_on_unmatched_files: true

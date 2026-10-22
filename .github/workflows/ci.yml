@@ -1,0 +1,61 @@
+name: ci
+
+# 只做「别退化」的编译检查，不出包 —— 出包在 release.yml，打 tag 时才跑。
+#
+# 覆盖的是仓库里唯一有真实平台风险的部分：gpui-mobile 的 iOS target。
+# 桌面端在 Windows 上本来就是开发环境，编不过会立刻发现，没必要占 CI 时间。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - "shared/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "shared/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ios-check:
+    name: iOS 编译检查
+    # 这里故意用 ubuntu 而不是 macos：iOS 依赖树是纯 Rust 的，
+    # 只有 core-foundation-sys 这类纯声明绑定，没有任何需要 Apple SDK
+    # 编译的 C 库，而 `cargo check` 不链接、不产出 .a，走不到 framework。
+    #
+    # 万一这条推理不成立（报找不到 SDK / clang），把下面这行换成
+    # macos-latest 即可，其余步骤一行都不用改，代价是 10 倍计费分钟。
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-check
+
+      - name: 安装 iOS 目标
+        run: rustup target add aarch64-apple-ios
+
+      # 只是 check，不产出静态库；.cargo/config.toml 里的
+      # RUST_FONTCONFIG_DLOPEN 会被自动带上，不用在这里重复设。
+      - name: cargo check
+        run: cargo check --locked --target aarch64-apple-ios -p pinyin-study-mobile
