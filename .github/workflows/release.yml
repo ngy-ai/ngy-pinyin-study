@@ -105,7 +105,10 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS (${{ runner.arch }})
+    # 这里不能用 ${{ runner.arch }}：runner 上下文只在 steps 里可用，
+    # 写在 jobs.<id>.name 会让整个 workflow 解析失败（Invalid workflow file）。
+    # 架构信息由打包步骤里的 $RUNNER_ARCH 环境变量带上，产物名仍然是 pinyin-study-macos-ARM64.zip。
+    name: macOS
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
