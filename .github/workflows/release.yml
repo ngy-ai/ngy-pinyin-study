@@ -46,12 +46,22 @@ jobs:
       - name: 安装 cargo-ndk
         run: cargo install cargo-ndk --locked
 
-      # 产物写到 mobile/android/app/src/main/jniLibs，Gradle 会打进去；
-      # 这里不用 NDK 直接编，交给 cargo-ndk 处理 minSdk 26 的 clang 链接参数。
+      # 产物写到 mobile/android/app/src/main/jniLibs，Gradle 会打进去。
+      #
+      # --platform 26 不能省：cargo-ndk 默认按 API 21 拼链接搜索路径，而
+      # ndk crate 的 nativewindow feature 要链接 libnativewindow.so，
+      # 这个库到 API 26 才进 NDK sysroot，默认值会直接报
+      # "unable to find library -lnativewindow"。
+      # 这个数和 app/build.gradle.kts 的 minSdk = 26 必须一致。
+      #
+      # 注意 -p 在此处之前是 cargo-ndk 的参数，在 build 之后才是包名，
+      # 所以 platform 用长写法避免歧义。
       - name: 交叉编译 Rust 库
         run: |
           export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
-          cargo ndk -t arm64-v8a -o mobile/android/app/src/main/jniLibs build --release -p pinyin-study-mobile
+          cargo ndk -t arm64-v8a --platform 26 \
+            -o mobile/android/app/src/main/jniLibs \
+            build --release -p pinyin-study-mobile
 
       # build.gradle.kts 里的 release 用的是本机 debug 签名，CI 上没有，先造一个
       - name: 生成 debug keystore
